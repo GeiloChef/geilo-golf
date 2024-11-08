@@ -428,14 +428,7 @@ export default class GameScene extends Phaser.Scene {
       this.scene.restart(); // Restart the level
     });
 
-    // Add the popup elements to the UI camera only
-    const uiCamera = this.cameras.getCamera('ui');
-
-    if (uiCamera) {
-      uiCamera.ignore([popup, text, strokeMessage, restartButton]);
-    }
-
-    // Ensure the main camera ignores the popup elements so they only appear on the UI camera
+    // Ensure the main camera ignores the popup elements, so they only appear on the UI camera
     this.cameras.main.ignore([popup, text, strokeMessage, restartButton]);
   }
 

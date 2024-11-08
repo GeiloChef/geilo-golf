@@ -55,12 +55,8 @@ export default class GameScene extends Phaser.Scene {
 
     // Set world bounds
     this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
-
     // Set camera bounds to restrict it within the world
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
-
-    // Initialize a static group for platforms
-    this.platforms = this.physics.add.staticGroup();
 
     // Set a plain color for the background (light blue for a sky effect)
     this.cameras.main.setBackgroundColor('#87CEEB');
@@ -68,35 +64,37 @@ export default class GameScene extends Phaser.Scene {
     // Create a new camera specifically for the UI that covers the entire viewport
     this.cameras.add(0, 0, width, height, false, 'ui');
 
-    // Draw the ground as a plain rectangle with a green color
+    this.physics.world.gravity.y = 500; // Adjust gravity to suit natural ball drop
+    this.platforms = this.physics.add.staticGroup();
+
+    // Add the ground as main platform
     platforms.push(
         { x: worldWidth / 2, y: worldHeight - groundHeight / 2, width: worldWidth, height: groundHeight, color: 0x228B22 },  // Ground
     );
+
+    // Add the platforms to the world
     this.createWorldData(platforms);
 
-    this.physics.world.gravity.y = 500; // Adjust gravity to suit natural ball drop
-
+    // Add the playable ball
     this.createBall(height);
-
-    // Add collision between the ball and all platforms in the group
-    this.physics.add.collider(this.ball, this.platforms);
-
-    // **Set the camera to follow the ball**
-    this.cameras.main.startFollow(this.ball);
 
     // Create the U-shaped goal
     this.createGoal(worldWidth - 100, worldHeight - 200);
-
-    // Set up input for aiming and shooting
-    this.input.on('pointerdown', this.startAiming, this);
-    this.input.on('pointermove', this.updateTrajectory, this); // Update trajectory while aiming
-    this.input.on('pointerup', this.shootBall, this);
 
     // Create a graphics object for the trajectory preview
     this.trajectoryGraphics = this.add.graphics();
 
     // Store the initial scale of the stroke text
     this.createStrokeText(width);
+
+    /**
+     * Listener for User Interaction
+     */
+
+    // Set up input for aiming and shooting
+    this.input.on('pointerdown', this.startAiming, this);
+    this.input.on('pointermove', this.updateTrajectory, this); // Update trajectory while aiming
+    this.input.on('pointerup', this.shootBall, this);
 
     // Set up scroll wheel zoom functionality
     this.input.on('wheel',
@@ -163,6 +161,12 @@ export default class GameScene extends Phaser.Scene {
     this.ball.setBounce(0.5); // Make the ball bouncy
     this.ball.setCollideWorldBounds(true); // Prevent ball from going out of bounds
     this.ball.setDrag(10);
+
+    // Add collision between the ball and all platforms in the group
+    this.physics.add.collider(this.ball, this.platforms);
+
+    // Set the camera to follow the ball
+    this.cameras.main.startFollow(this.ball);
   }
 
   createGoal(x: number, y: number) {

@@ -1,4 +1,23 @@
 import Phaser from 'phaser';
+interface PlatformData {
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: number
+}
+
+interface PointerPosition {
+  x: number,
+  y: number
+}
+
+const groundHeight = 40;
+
+const platforms: PlatformData[] = [
+  { x: 400 + 77, y: 500, width: 400, height: groundHeight, color: 0x228B22 },
+  { x: 400, y: 500, width: 155, height: groundHeight, color: 0x228B22 },
+];
 
 export default class GameScene extends Phaser.Scene {
   private ball!: Phaser.Physics.Arcade.Image;
@@ -47,52 +66,19 @@ export default class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#87CEEB');
 
     // Create a new camera specifically for the UI that covers the entire viewport
-    const uiCamera = this.cameras.add(0, 0, width, height);
+    this.cameras.add(0, 0, width, height, false, 'ui');
 
     // Draw the ground as a plain rectangle with a green color
-    const groundHeight = 40;
-    const platformData = [
-      { x: worldWidth / 2, y: worldHeight - groundHeight / 2, width: worldWidth, height: groundHeight, color: 0x228B22 },  // Ground
-      { x: worldWidth / 2 + 77, y: worldHeight - 200, width: 400, height: groundHeight, color: 0x228B22 },
-      { x: worldWidth, y: worldHeight - 200, width: 155, height: groundHeight, color: 0x228B22 },
-    ];
-
-    // Create platforms from data
-    platformData.forEach(({ x, y, width: platformWidth, height: platformHeight, color }, index) => {
-        // Create regular platforms without holes
-        const platform = this.add.rectangle(x, y, platformWidth, platformHeight, color);
-
-        this.platforms.add(platform);
-        this.physics.add.existing(platform, true);
-    });
-
-    // Convert all platform objects in the group to static physics bodies
-    this.platforms.getChildren().forEach((platform) => {
-      this.physics.add.existing(platform, true);
-    });
-
-    // Create the ball as a filled circle
-    const ballRadius = 10;
-    const ballGraphics = this.add.graphics();
-
-    ballGraphics.fillStyle(0xff4500, 1); // Orange color for the ball
-    ballGraphics.fillCircle(ballRadius, ballRadius, ballRadius); // Draw a filled circle
-
-    // Generate a texture from the graphics and use it for the ball
-    ballGraphics.generateTexture('ballTexture', ballRadius * 2, ballRadius * 2);
-    ballGraphics.destroy(); // Clean up graphics after generating texture
+    platforms.push(
+        { x: worldWidth / 2, y: worldHeight - groundHeight / 2, width: worldWidth, height: groundHeight, color: 0x228B22 },  // Ground
+    );
+    this.createWorldData(platforms);
 
     this.physics.world.gravity.y = 500; // Adjust gravity to suit natural ball drop
 
-    this.ball = this.physics.add.image(50, height - 50 - groundHeight, 'ballTexture');
-    this.ball.setCircle(ballRadius); // Set physics body as a circle with radius
-    this.ball.setOrigin(0.5, 0.5); // Center the texture on the physics body
-    this.ball.setBounce(0.5); // Make the ball bouncy
-    this.ball.setCollideWorldBounds(true); // Prevent ball from going out of bounds
-    this.ball.setDrag(10);
+    this.createBall(height);
 
     // Add collision between the ball and all platforms in the group
-    // todo: add handle bounce
     this.physics.add.collider(this.ball, this.platforms);
 
     // **Set the camera to follow the ball**
@@ -109,22 +95,8 @@ export default class GameScene extends Phaser.Scene {
     // Create a graphics object for the trajectory preview
     this.trajectoryGraphics = this.add.graphics();
 
-    // Create stroke counter text at the top right
-    this.strokeText = this.add.text(width - 20, 20, 'Strokes: 0', {
-      font: '18px Arial',
-      color: '#ffffff',
-      backgroundColor: '#000000',
-      padding: { x: 5, y: 5 },
-    }).setOrigin(1, 0); // Align to the top right
-
-    // Set the main camera to ignore the strokeText so it only appears in the UI camera
-    this.cameras.main.ignore(this.strokeText);
-
-    // Set the UI camera to ignore everything else except strokeText
-    uiCamera.ignore(this.children.list.filter(child => child !== this.strokeText));
-
     // Store the initial scale of the stroke text
-    const baseTextScale = 1;
+    this.createStrokeText(width);
 
     // Set up scroll wheel zoom functionality
     this.input.on('wheel',
@@ -135,6 +107,62 @@ export default class GameScene extends Phaser.Scene {
 
         this.cameras.main.zoom = newZoom;
       });
+  }
+
+  createWorldData(platformData: PlatformData[]) {
+    // Create platforms from data
+    platformData.forEach(({ x, y, width: platformWidth, height: platformHeight, color }, index) => {
+      // Create regular platforms without holes
+      const platform = this.add.rectangle(x, y, platformWidth, platformHeight, color);
+
+      this.platforms.add(platform);
+      this.physics.add.existing(platform, true);
+    });
+
+    // Convert all platform objects in the group to static physics bodies
+    this.platforms.getChildren().forEach((platform) => {
+      this.physics.add.existing(platform, true);
+    });
+  }
+
+  createStrokeText(gameAreaWidth: number) {
+    // Create stroke counter text at the top right
+    this.strokeText = this.add.text(gameAreaWidth - 20, 20, 'Strokes: 0', {
+      font: '18px Arial',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 5, y: 5 },
+    }).setOrigin(1, 0); // Align to the top right
+
+    // Set the main camera to ignore the strokeText, so it only appears in the UI camera
+    this.cameras.main.ignore(this.strokeText);
+
+    // Set the UI camera to ignore everything else except strokeText
+    const uiCamera = this.cameras.getCamera('ui');
+
+    if (uiCamera) {
+      uiCamera.ignore(this.children.list.filter(child => child !== this.strokeText));
+    }
+  }
+
+  createBall(height: number) {
+    // Create the ball as a filled circle
+    const ballRadius = 10;
+    const ballGraphics = this.add.graphics();
+
+    ballGraphics.fillStyle(0xff4500, 1); // Orange color for the ball
+    ballGraphics.fillCircle(ballRadius, ballRadius, ballRadius); // Draw a filled circle
+
+    // Generate a texture from the graphics and use it for the ball
+    ballGraphics.generateTexture('ballTexture', ballRadius * 2, ballRadius * 2);
+    ballGraphics.destroy(); // Clean up graphics after generating texture
+
+    this.ball = this.physics.add.image(50, height - 50 - groundHeight, 'ballTexture');
+    this.ball.setCircle(ballRadius); // Set physics body as a circle with radius
+    this.ball.setOrigin(0.5, 0.5); // Center the texture on the physics body
+    this.ball.setBounce(0.5); // Make the ball bouncy
+    this.ball.setCollideWorldBounds(true); // Prevent ball from going out of bounds
+    this.ball.setDrag(10);
   }
 
   createGoal(x: number, y: number) {
@@ -189,29 +217,6 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  // Collision callback to reduce velocity on each bounce
-  handleBounce() {
-    if (!this.isBouncing) {
-      this.isBouncing = true;
-
-      const ballBody = this.ball.body as Phaser.Physics.Arcade.Body;
-
-      // Gradually reduce the bounce factor on each ground impact
-      if (ballBody.bounce.y > 0.1) {
-        this.ball.setBounce(ballBody.bounce.y * 0.8); // Reduce bounce by 20%
-      } else {
-        // Stop bouncing if the bounce factor is too low
-        this.ball.setBounce(0);
-        ballBody.setVelocityY(0);
-      }
-
-      // Reset isBouncing flag after a short delay to prepare for the next bounce
-      this.time.delayedCall(50, () => {
-        this.isBouncing = false;
-      });
-    }
-  }
-
   startAiming(pointer: Phaser.Input.Pointer) {
     if (!this.ball || !this.ball.body) return;
 
@@ -236,11 +241,17 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  getPointerPosition(event: PointerEvent):PointerPosition  {
+    // Convert the document-level pointer coordinates to Phaser’s coordinate system
+    return {
+      x: event.clientX - this.game.canvas.getBoundingClientRect().left,
+      y: event.clientY - this.game.canvas.getBoundingClientRect().top
+    };
+  }
+
   handlePointerUpOutside = (event: PointerEvent) => {
     if (this.isAiming) {
-      // Convert the document-level pointer coordinates to Phaser’s coordinate system
-      const pointerX = event.clientX - this.game.canvas.getBoundingClientRect().left;
-      const pointerY = event.clientY - this.game.canvas.getBoundingClientRect().top;
+      const { x: pointerX, y: pointerY } = this.getPointerPosition(event);
 
       // Call shootBall with the calculated coordinates
       this.shootBall(pointerX, pointerY);
@@ -255,9 +266,7 @@ export default class GameScene extends Phaser.Scene {
   };
   handlePointerMoveOutside = (event: PointerEvent) => {
     if (this.isAiming) {
-      // Convert the document-level pointer coordinates to Phaser’s coordinate system
-      const pointerX = event.clientX - this.game.canvas.getBoundingClientRect().left;
-      const pointerY = event.clientY - this.game.canvas.getBoundingClientRect().top;
+      const { x: pointerX, y: pointerY } = this.getPointerPosition(event);
 
       // Update the trajectory using the calculated pointer coordinates
       this.updateTrajectory(pointerX, pointerY);
@@ -270,15 +279,8 @@ export default class GameScene extends Phaser.Scene {
 
       this.trajectoryGraphics.clear();
 
-      const angle = Phaser.Math.Angle.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y);
-      const invertedAngle = angle + Math.PI;
-      //const power = Phaser.Math.Distance.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y) * this.powerMultiplier;
-
-      const power = Phaser.Math.Clamp(
-        Phaser.Math.Distance.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y) * (this.powerMultiplier),
-        0,
-        1500 // Maximum power to limit the trajectory length
-      );
+      const invertedAngle = this.calculateAngle(worldPoint);
+      const power = this.calculatePower(worldPoint);
 
       this.drawTrajectory(invertedAngle, power);
     }
@@ -314,21 +316,30 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  calculateAngle(worldPoint: Phaser.Math.Vector2): number {
+    const angle = Phaser.Math.Angle.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y);
+    const invertedAngle = angle + Math.PI;
+
+    return invertedAngle;
+  }
+
+  calculatePower(worldPoint: Phaser.Math.Vector2): number {
+    const power = Phaser.Math.Clamp(
+      Phaser.Math.Distance.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y) * (this.powerMultiplier),
+      0,
+      1500
+    );
+
+    return power;
+  }
+
   shootBall(pointerX: number, pointerY: number) {
     if (this.isAiming) {
       // Convert screen coordinates to world coordinates
       const worldPoint = this.cameras.main.getWorldPoint(pointerX, pointerY);
 
-      const angle = Phaser.Math.Angle.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y);
-      const invertedAngle = angle + Math.PI;
-      // const power = Phaser.Math.Distance.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y) * this.powerMultiplier;
-
-      // Adjust the power as in `updateTrajectory`
-      const power = Phaser.Math.Clamp(
-        Phaser.Math.Distance.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y) * (this.powerMultiplier),
-        0,
-        1500
-      );
+      const invertedAngle = this.calculateAngle(worldPoint);
+      const power = this.calculatePower(worldPoint);
 
       this.ball.setVelocity(
         power * Math.cos(invertedAngle),

@@ -21,7 +21,7 @@ jobs:
       - name: Build website
         run: |
           npm install --non-interactive
-          npm run build-only
+          npm run build
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4.5.0
         with:

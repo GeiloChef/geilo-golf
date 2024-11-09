@@ -10,6 +10,8 @@ interface PointerPosition {
 
 const groundHeight = 40;
 
+const debug: boolean = false;
+
 export default class GameScene extends Phaser.Scene {
   private ball!: Phaser.Physics.Arcade.Image;
   private isAiming: boolean = false;
@@ -303,11 +305,13 @@ export default class GameScene extends Phaser.Scene {
       goalConfig.walls.height * 0.75             // Height of the goal area
     );
 
-    // Visualize the goal area with a semi-transparent color for debugging
-    const goalAreaGraphics = this.add.graphics();
+    if (debug) {
+      // Visualize the goal area with a semi-transparent color for debugging
+      const goalAreaGraphics = this.add.graphics();
 
-    goalAreaGraphics.fillStyle(0x00ff00, 0.3); // Green color with 30% opacity
-    goalAreaGraphics.fillRectShape(this.goalArea);
+      goalAreaGraphics.fillStyle(0x00ff00, 0.3); // Green color with 30% opacity
+      goalAreaGraphics.fillRectShape(this.goalArea);
+    }
 
     // Collision detection for winning when the ball enters the U shape
     this.physics.add.overlap(this.ball, this.goal, this.startGoalStayTimer, undefined, this);

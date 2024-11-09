@@ -1,0 +1,33 @@
+name: Release Build
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version: '20'
+      - name: Build website
+        run: |
+          npm install --non-interactive
+          npm run build
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4.5.0
+        with:
+          folder: dist
+          clean: true
+          clean-exclude: |
+            "CNAME"
+            ".gitattributes"
+          single-commit: true

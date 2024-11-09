@@ -28,14 +28,18 @@ export default class GameScene extends Phaser.Scene {
   private goal!: Phaser.Physics.Arcade.Image; // The invisible sensor for the goal
   private goalArea!: Phaser.Geom.Rectangle;
   private goalTimer?: Phaser.Time.TimerEvent; // Timer to track ball in goal
+  private powerBar!: Phaser.GameObjects.Graphics;
+  private powerText!: Phaser.GameObjects.Text;
 
   private groundDrag: number = 200;
   private airDrag: number = 10;
   private bounceDrag: number = 500;
-  private powerMultiplier: number = 1.5;
+  private powerMultiplier: number = 1.8;
+  private maxPower: number = 1000; // Adjust this value based on max power needed
 
   private strokeCount: number = 0; // Stroke counter
   private strokeText!: Phaser.GameObjects.Text; // Text to display the stroke counter
+
 
   private gameObjectsGroup!: Phaser.GameObjects.Group;
   private uiElementsGroup!: Phaser.GameObjects.Group;
@@ -91,6 +95,9 @@ export default class GameScene extends Phaser.Scene {
     // Create a graphics object for the trajectory preview
     this.trajectoryGraphics = this.add.graphics();
     this.gameObjectsGroup.add(this.trajectoryGraphics);
+
+    // Power bar setup
+    this.createPowerBar();
 
     // Store the initial scale of the stroke text
     this.createStrokeText(width);
@@ -287,6 +294,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   startAiming(pointer: Phaser.Input.Pointer) {
+    // todo: hide mouse and only track the movement of the mouse
     if (!this.ball || !this.ball.body) return;
 
     // Convert pointer coordinates to world coordinates
@@ -342,6 +350,54 @@ export default class GameScene extends Phaser.Scene {
     }
   };
 
+  private createPowerBar() {
+    const { width } = this.scale;
+    const barWidth = 200;
+
+    this.powerBar = this.add.graphics();
+    this.powerText = this.add.text(width - barWidth - 15, 70, 'Power: 0%', {
+      font: '16px Arial',
+      color: '#000000',
+    }).setOrigin(0, 0.5); // Left align within the bar
+
+    this.drawPowerBar(0); // Initially draw the power bar with no fill
+    this.uiElementsGroup.add(this.powerBar);
+    this.uiElementsGroup.add(this.powerText);
+  }
+
+  private drawPowerBar(currentPower: number) {
+    const { width } = this.scale;
+    const barWidth = 200;
+    const barHeight = 20;
+    const fillWidth = (currentPower / this.maxPower) * barWidth;
+
+    this.powerBar.clear();
+
+    // Define color gradient based on power level
+    let color = 0x00ff00; // Start with green
+
+    if (currentPower > this.maxPower * 0.75) {
+      color = 0xff0000; // Red at high power
+    } else if (currentPower > this.maxPower * 0.5) {
+      color = 0xffa500; // Orange at medium-high power
+    } else if (currentPower > this.maxPower * 0.25) {
+      color = 0xffff00; // Yellow at medium power
+    }
+
+    // Draw background and fill for power bar
+    this.powerBar.fillStyle(0x000000, 1); // Background color
+    this.powerBar.fillRect(width - barWidth - 20, 60, barWidth, barHeight);
+
+    this.powerBar.fillStyle(color, 1); // Apply color gradient
+    this.powerBar.fillRect(width - barWidth - 20, 60, fillWidth, barHeight);
+
+    // Update power percentage text and position it inside the bar
+    const powerPercent = Math.round((currentPower / this.maxPower) * 100);
+
+    this.powerText.setText(`Power: ${powerPercent}%`);
+    this.powerText.setPosition(width - barWidth - 15, 70); // Inside the bar, left aligned
+  }
+
   updateTrajectory(pointerX: number, pointerY: number) {
     if (this.isAiming) {
       const worldPoint = this.cameras.main.getWorldPoint(pointerX, pointerY);
@@ -352,6 +408,7 @@ export default class GameScene extends Phaser.Scene {
       const power = this.calculatePower(worldPoint);
 
       this.drawTrajectory(invertedAngle, power);
+      this.drawPowerBar(power);
     }
   }
 
@@ -396,7 +453,7 @@ export default class GameScene extends Phaser.Scene {
     const power = Phaser.Math.Clamp(
       Phaser.Math.Distance.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y) * (this.powerMultiplier),
       0,
-      1500
+      this.maxPower
     );
 
     return power;
@@ -417,6 +474,7 @@ export default class GameScene extends Phaser.Scene {
 
       this.trajectoryGraphics.clear();
       this.isAiming = false;
+      this.drawPowerBar(0);
 
       // Increment stroke count and update display
       this.strokeCount++;
@@ -497,8 +555,14 @@ export default class GameScene extends Phaser.Scene {
       this.scene.restart(); // Restart the level
     });
 
+    const miniMapCamera = this.cameras.getCamera('mini-map');
+
     // Ensure the main camera ignores the popup elements, so they only appear on the UI camera
     this.cameras.main.ignore([popup, text, strokeMessage, restartButton]);
+
+    if (miniMapCamera) {
+      miniMapCamera.ignore([popup, text, strokeMessage, restartButton]);
+    }
   }
 
   resetLevel() {

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 
-import { mapData } from '@/game/maps/default/map1';
-import { GoalConfig, PlatformData } from '@/models/MapInterfaces';
+import { mapData as Level1 } from '@/game/levels/default/level1';
+import { mapData as Level2 } from '@/game/levels/default/level2';
+import { GoalConfig, MapDataConfig, PlatformData } from '@/models/MapInterfaces';
 
 interface PointerPosition {
   x: number,
@@ -11,6 +12,8 @@ interface PointerPosition {
 const groundHeight = 40;
 
 const debug: boolean = false;
+
+const levels = [Level1, Level2];
 
 export default class GameScene extends Phaser.Scene {
   private ball!: Phaser.Physics.Arcade.Image;
@@ -38,16 +41,18 @@ export default class GameScene extends Phaser.Scene {
   private strokeCount: number = 0; // Stroke counter
   private strokeText!: Phaser.GameObjects.Text; // Text to display the stroke counter
 
-
   private gameObjectsGroup!: Phaser.GameObjects.Group;
   private uiElementsGroup!: Phaser.GameObjects.Group;
+
+  private currentLevelIndex: number = 0;
+  private currentLevel!: MapDataConfig;
 
   constructor() {
     super({ key: 'GameScene' });
   }
 
   preload() {
-    // No assets to preload, using graphics only
+    // no assets to load
   }
 
   create() {
@@ -55,39 +60,18 @@ export default class GameScene extends Phaser.Scene {
 
     this.physics.world.gravity.y = 500;
 
-    const currentMap = mapData;
+    // Initialize groups
+    this.gameObjectsGroup = this.add.group(); // Physics group for game objects
+    this.uiElementsGroup = this.add.group(); // Standard group for UI elements
+    this.platforms = this.physics.add.staticGroup();
 
-    // Set world bounds
-    this.physics.world.setBounds(0, 0, currentMap.width, currentMap.height);
-    // Set camera bounds to restrict it within the world
-    this.cameras.main.setBounds(0, 0, currentMap.width, currentMap.height);
+    this.loadLevel(this.currentLevelIndex);
 
     // Set a plain color for the background (light blue for a sky effect)
     this.cameras.main.setBackgroundColor('#87CEEB');
 
     // Create a new camera specifically for the UI that covers the entire viewport
     this.cameras.add(0, 0, width, height, false, 'ui');
-
-    this.physics.world.gravity.y = 500; // Adjust gravity to suit natural ball drop
-    this.platforms = this.physics.add.staticGroup();
-
-    // Initialize groups
-    this.gameObjectsGroup = this.add.group(); // Physics group for game objects
-    this.uiElementsGroup = this.add.group(); // Standard group for UI elements
-
-    // Add the ground as main platform
-    currentMap.platforms.push(
-        { x: currentMap.width / 2, y: currentMap.height - groundHeight / 2, width: currentMap.height, height: groundHeight, color: 0x228B22 },  // Ground
-    );
-
-    // Add the platforms to the world
-    this.createWorldData(currentMap.platforms);
-
-    // Add the playable ball
-    this.createBall(currentMap.ballSpawn.x, currentMap.ballSpawn.y);
-
-    // Create the U-shaped goal
-    this.createGoal(currentMap.goal);
 
     // Create a graphics object for the trajectory preview
     this.trajectoryGraphics = this.add.graphics();
@@ -133,6 +117,43 @@ export default class GameScene extends Phaser.Scene {
 
         this.cameras.main.zoom = newZoom;
       });
+  }
+
+  loadLevel(levelIndex: number) {
+    // Clear previous level objects if needed
+    if (this.platforms) this.platforms.clear(true, true);
+
+    if (this.goal) this.goal.destroy();
+
+    // Load level data
+    this.currentLevel = levels[levelIndex];
+
+    if (!this.currentLevel) return; // Exit if the level doesn't exist
+
+    // Set world bounds
+    this.physics.world.setBounds(0, 0, this.currentLevel.width, this.currentLevel.height);
+    // Set camera bounds to restrict it within the world
+    this.cameras.main.setBounds(0, 0, this.currentLevel.width, this.currentLevel.height);
+
+    // Add the ground as main platform
+    this.currentLevel.platforms.push(
+      {
+        x: this.currentLevel.width / 2,
+        y: this.currentLevel.height - groundHeight / 2,
+        width: this.currentLevel.height,
+        height: groundHeight,
+        color: 0x228B22
+      },  // Ground
+    );
+
+    // Add the platforms to the world
+    this.createWorldData(this.currentLevel.platforms);
+
+    // Add the playable ball
+    this.createBall(this.currentLevel.ballSpawn.x, this.currentLevel.ballSpawn.y);
+
+    // Create the U-shaped goal
+    this.createGoal(this.currentLevel.goal);
   }
 
   createMiniMap() {
@@ -567,7 +588,7 @@ export default class GameScene extends Phaser.Scene {
 
     strokeMessage.setOrigin(0.5);
 
-    const restartButton = this.add.text(width / 2, height / 2 + 60, 'Restart', {
+    const restartButton = this.add.text(width / 2, height / 2 + 60, 'Next Level', {
       font: '20px Arial',
       color: '#ff4500',
       backgroundColor: '#ffffff',
@@ -578,8 +599,7 @@ export default class GameScene extends Phaser.Scene {
     restartButton.setInteractive();
 
     restartButton.on('pointerdown', () => {
-      this.resetLevel();
-      this.scene.restart(); // Restart the level
+      this.finishLevel();
     });
 
     const miniMapCamera = this.cameras.getCamera('mini-map');
@@ -592,7 +612,18 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  resetLevel() {
+  finishLevel() {
     this.strokeCount = 0;
+
+    this.time.delayedCall(2000, () => {
+      this.currentLevelIndex++;
+
+      if (this.currentLevelIndex < levels.length) {
+        this.loadLevel(this.currentLevelIndex); // Load next level
+        this.scene.restart(); // Restart or end game if no more levels
+      } else {
+        this.scene.restart(); // Restart or end game if no more levels
+      }
+    });
   }
 }

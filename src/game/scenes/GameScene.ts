@@ -30,6 +30,11 @@ export default class GameScene extends Phaser.Scene {
   private goalTimer?: Phaser.Time.TimerEvent; // Timer to track ball in goal
   private powerBar!: Phaser.GameObjects.Graphics;
   private powerText!: Phaser.GameObjects.Text;
+  private lastAimX: number = 0;
+  private lastAimY: number = 0;
+  private startAimX: number = 0;
+  private startAimY: number = 0;
+  private ballOnGround: boolean = false; // Add a flag to track ground contact
 
   private groundDrag: number = 200;
   private airDrag: number = 10;
@@ -122,10 +127,10 @@ export default class GameScene extends Phaser.Scene {
      * Listener for User Interaction
      */
 
-    // Set up input for aiming and shooting
+    // Request pointer lock when aiming starts
     this.input.on('pointerdown', this.startAiming, this);
-    this.input.on('pointermove', this.updateTrajectory, this); // Update trajectory while aiming
-    this.input.on('pointerup', this.shootBall, this);
+    document.addEventListener('pointermove', this.handlePointerMoveOutside);
+    document.addEventListener('mouseup', this.handlePointerUpOutside);
 
     // Set up scroll wheel zoom functionality
     this.input.on('wheel',
@@ -232,7 +237,19 @@ export default class GameScene extends Phaser.Scene {
     this.ball.setDrag(10);
 
     // Add collision between the ball and all platforms in the group
-    this.physics.add.collider(this.ball, this.platforms);
+    //this.physics.add.collider(this.ball, this.platforms);
+
+    // Set up a collision callback to detect when the ball touches the ground
+    this.physics.add.collider(this.ball, this.platforms, () => {
+      this.ballOnGround = true;
+    });
+
+    // Call `preUpdate` to reset `ballOnGround` if the ball is not touching ground
+    this.events.on('preupdate', () => {
+      const ballBody = this.ball.body as Phaser.Physics.Arcade.Body;
+
+      this.ballOnGround = ballBody.blocked.down || ballBody.touching.down;
+    });
 
     // Set the camera to follow the ball
     this.cameras.main.startFollow(this.ball);
@@ -293,29 +310,32 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  startAiming(pointer: Phaser.Input.Pointer) {
-    // todo: hide mouse and only track the movement of the mouse
-    if (!this.ball || !this.ball.body) return;
+  startAiming() {
+    if (!this.ball || !this.ball.body || !this.input.mouse) return;
 
-    // Convert pointer coordinates to world coordinates
-    const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    // Check if the ball is stationary and on the ground
+    const ballBody = this.ball.body as Phaser.Physics.Arcade.Body;
+    const isBallStationary = Math.abs(ballBody.velocity.x) === 0;
 
-    // Check if the pointer is within the bounds of the ball
-    const distanceToBall = Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, this.ball.x, this.ball.y);
-    const ballRadius = this.ball.displayWidth / 2;
+    if (!isBallStationary || !this.ballOnGround) return; // Exit if the ball is moving or in the air
 
-    // Only enable aiming if the pointer is on the ball
-    if (distanceToBall <= ballRadius) {
-      this.isAiming = true;
-
-      // Add a global pointerup event listener on the window to detect releases outside the game area
-      document.addEventListener('pointerup', this.handlePointerUpOutside);
-      document.addEventListener('pointermove', this.handlePointerMoveOutside);
-
-      // Set up the trajectory update and shoot event listeners within the game screen
-      this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.updateTrajectory(p.x, p.y), this);
-      this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.shootBall(p.x, p.y), this);
+    // Request pointer lock when starting to aim
+    if (!this.input.mouse.locked) {
+      this.input.mouse.requestPointerLock();
     }
+
+    this.isAiming = true;
+
+    // Initialize aiming data based on ball position
+    this.startAimX = this.ball.x;
+    this.startAimY = this.ball.y;
+
+    // Set lastAimX and lastAimY to the starting aim position
+    this.lastAimX = this.startAimX;
+    this.lastAimY = this.startAimY;
+
+    // Hide the cursor for visual feedback
+    this.input.setDefaultCursor('none');
   }
 
   getPointerPosition(event: PointerEvent):PointerPosition  {
@@ -326,27 +346,21 @@ export default class GameScene extends Phaser.Scene {
     };
   }
 
-  handlePointerUpOutside = (event: PointerEvent) => {
+  handlePointerUpOutside = () => {
     if (this.isAiming) {
-      const { x: pointerX, y: pointerY } = this.getPointerPosition(event);
-
       // Call shootBall with the calculated coordinates
-      this.shootBall(pointerX, pointerY);
-
-      // Remove global listeners after firing
-      document.removeEventListener('pointerup', this.handlePointerUpOutside);
-      document.removeEventListener('pointermove', this.handlePointerMoveOutside);
-
-      this.input.off('pointermove', this.updateTrajectory, this);
-      this.input.off('pointerup', this.shootBall, this);
+      this.shootBall();
+      this.isAiming = false;
     }
   };
   handlePointerMoveOutside = (event: PointerEvent) => {
-    if (this.isAiming) {
-      const { x: pointerX, y: pointerY } = this.getPointerPosition(event);
+    if (this.isAiming && this.input.mouse!.locked) {
+      // Use relative movement to adjust power and angle
+      this.lastAimX += event.movementX;
+      this.lastAimY += event.movementY;
 
-      // Update the trajectory using the calculated pointer coordinates
-      this.updateTrajectory(pointerX, pointerY);
+      // Update trajectory and power bar based on new aim position
+      this.updateTrajectory();
     }
   };
 
@@ -398,14 +412,12 @@ export default class GameScene extends Phaser.Scene {
     this.powerText.setPosition(width - barWidth - 15, 70); // Inside the bar, left aligned
   }
 
-  updateTrajectory(pointerX: number, pointerY: number) {
+  updateTrajectory() {
     if (this.isAiming) {
-      const worldPoint = this.cameras.main.getWorldPoint(pointerX, pointerY);
-
       this.trajectoryGraphics.clear();
 
-      const invertedAngle = this.calculateAngle(worldPoint);
-      const power = this.calculatePower(worldPoint);
+      const invertedAngle = this.calculateAngle();
+      const power = this.calculatePower();
 
       this.drawTrajectory(invertedAngle, power);
       this.drawPowerBar(power);
@@ -442,16 +454,16 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  calculateAngle(worldPoint: Phaser.Math.Vector2): number {
-    const angle = Phaser.Math.Angle.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y);
+  calculateAngle(): number {
+    const angle = Phaser.Math.Angle.Between(this.ball.x, this.ball.y, this.lastAimX, this.lastAimY);
     const invertedAngle = angle + Math.PI;
 
     return invertedAngle;
   }
 
-  calculatePower(worldPoint: Phaser.Math.Vector2): number {
+  calculatePower(): number {
     const power = Phaser.Math.Clamp(
-      Phaser.Math.Distance.Between(this.ball.x, this.ball.y, worldPoint.x, worldPoint.y) * (this.powerMultiplier),
+      Phaser.Math.Distance.Between(this.ball.x, this.ball.y, this.lastAimX, this.lastAimY) * (this.powerMultiplier),
       0,
       this.maxPower
     );
@@ -459,33 +471,32 @@ export default class GameScene extends Phaser.Scene {
     return power;
   }
 
-  shootBall(pointerX: number, pointerY: number) {
+  shootBall() {
     if (this.isAiming) {
-      // Convert screen coordinates to world coordinates
-      const worldPoint = this.cameras.main.getWorldPoint(pointerX, pointerY);
 
-      const invertedAngle = this.calculateAngle(worldPoint);
-      const power = this.calculatePower(worldPoint);
+      const invertedAngle = this.calculateAngle();
+      const power = this.calculatePower();
 
       this.ball.setVelocity(
         power * Math.cos(invertedAngle),
         power * Math.sin(invertedAngle)
       );
 
+      // Reset aiming state and power bar
       this.trajectoryGraphics.clear();
+      this.drawPowerBar(0); // Reset power bar after shooting
+      this.powerText.setText('Power: 0%');
       this.isAiming = false;
-      this.drawPowerBar(0);
-
-      // Increment stroke count and update display
       this.strokeCount++;
       this.strokeText.setText(`Strokes: ${this.strokeCount}`);
 
-      // Remove global listeners to avoid memory leaks
-      document.removeEventListener('pointerup', this.handlePointerUpOutside);
-      document.removeEventListener('pointermove', this.handlePointerMoveOutside);
+      // Release pointer lock after shooting
+      if (this.input.mouse!.locked) {
+        this.input.mouse!.releasePointerLock();
+      }
 
-      this.input.off('pointermove', this.updateTrajectory, this);
-      this.input.off('pointerup', this.shootBall, this);
+      // Restore cursor
+      this.input.setDefaultCursor('auto');
     }
   }
 

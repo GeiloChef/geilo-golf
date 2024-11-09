@@ -1,11 +1,7 @@
 import Phaser from 'phaser';
-interface PlatformData {
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  color: number
-}
+
+import { mapData } from '@/game/maps/default/map1';
+import { GoalConfig, PlatformData } from '@/models/MapInterfaces';
 
 interface PointerPosition {
   x: number,
@@ -13,11 +9,6 @@ interface PointerPosition {
 }
 
 const groundHeight = 40;
-
-const platforms: PlatformData[] = [
-  { x: 400 + 77, y: 500, width: 400, height: groundHeight, color: 0x228B22 },
-  { x: 400, y: 500, width: 155, height: groundHeight, color: 0x228B22 },
-];
 
 export default class GameScene extends Phaser.Scene {
   private ball!: Phaser.Physics.Arcade.Image;
@@ -60,15 +51,14 @@ export default class GameScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    const worldWidth = width * 2;  // Twice the width of the visible area
-    const worldHeight = height * 2; // Twice the height of the visible area
-
     this.physics.world.gravity.y = 500;
 
+    const currentMap = mapData;
+
     // Set world bounds
-    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+    this.physics.world.setBounds(0, 0, currentMap.width, currentMap.height);
     // Set camera bounds to restrict it within the world
-    this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+    this.cameras.main.setBounds(0, 0, currentMap.width, currentMap.height);
 
     // Set a plain color for the background (light blue for a sky effect)
     this.cameras.main.setBackgroundColor('#87CEEB');
@@ -84,18 +74,18 @@ export default class GameScene extends Phaser.Scene {
     this.uiElementsGroup = this.add.group(); // Standard group for UI elements
 
     // Add the ground as main platform
-    platforms.push(
-        { x: worldWidth / 2, y: worldHeight - groundHeight / 2, width: worldWidth, height: groundHeight, color: 0x228B22 },  // Ground
+    currentMap.platforms.push(
+        { x: currentMap.width / 2, y: currentMap.height - groundHeight / 2, width: currentMap.height, height: groundHeight, color: 0x228B22 },  // Ground
     );
 
     // Add the platforms to the world
-    this.createWorldData(platforms);
+    this.createWorldData(currentMap.platforms);
 
     // Add the playable ball
-    this.createBall(height);
+    this.createBall(currentMap.ballSpawn.x, currentMap.ballSpawn.y);
 
     // Create the U-shaped goal
-    this.createGoal(worldWidth - 100, worldHeight - 200);
+    this.createGoal(currentMap.goal);
 
     // Create a graphics object for the trajectory preview
     this.trajectoryGraphics = this.add.graphics();
@@ -217,7 +207,7 @@ export default class GameScene extends Phaser.Scene {
     this.uiElementsGroup.add(this.strokeText);
   }
 
-  createBall(height: number) {
+  createBall(posX: number, posY: number) {
     // Create the ball as a filled circle
     const ballRadius = 10;
     const ballGraphics = this.add.graphics();
@@ -229,7 +219,7 @@ export default class GameScene extends Phaser.Scene {
     ballGraphics.generateTexture('ballTexture', ballRadius * 2, ballRadius * 2);
     ballGraphics.destroy(); // Clean up graphics after generating texture
 
-    this.ball = this.physics.add.image(50, height - 50 - groundHeight, 'ballTexture');
+    this.ball = this.physics.add.image(posX, posY, 'ballTexture');
     this.ball.setCircle(ballRadius); // Set physics body as a circle with radius
     this.ball.setOrigin(0.5, 0.5); // Center the texture on the physics body
     this.ball.setBounce(0.5); // Make the ball bouncy
@@ -258,32 +248,48 @@ export default class GameScene extends Phaser.Scene {
     this.gameObjectsGroup.add(this.ball);
   }
 
-  createGoal(x: number, y: number) {
-    const wallHeight = 40;
-    const wallWidth = 5;
-    const baseWidth = 40;
-
+  createGoal(goalConfig: GoalConfig) {
     // Left wall of the U
-    const leftWall = this.add.rectangle(x - baseWidth / 2, y, wallWidth, wallHeight, 0xFFD700);
+    const leftWall = this.add.rectangle(
+      goalConfig.position.x - goalConfig.base.width / 2,
+      goalConfig.position.y,
+      goalConfig.walls.width,
+      goalConfig.walls.height,
+      0xFFD700);
 
     this.physics.add.existing(leftWall, true);
     this.platforms.add(leftWall);
+    this.gameObjectsGroup.add(leftWall);
 
     // Right wall of the U
-    const rightWall = this.add.rectangle(x + baseWidth / 2, y, wallWidth, wallHeight, 0xFFD700);
+    const rightWall = this.add.rectangle(
+      goalConfig.position.x + goalConfig.base.width / 2,
+      goalConfig.position.y,
+      goalConfig.walls.width,
+      goalConfig.walls.height,
+      0xFFD700);
 
     this.physics.add.existing(rightWall, true);
     this.platforms.add(rightWall);
+    this.gameObjectsGroup.add(rightWall);
+
 
     // Bottom base of the U
-    const bottomBase = this.add.rectangle(x, y + wallHeight / 2 - wallWidth / 2, baseWidth, wallWidth, 0xFFD700);
+    const bottomBase = this.add.rectangle(
+      goalConfig.position.x,
+      goalConfig.position.y + goalConfig.walls.height / 2 - goalConfig.walls.width / 2,
+      goalConfig.base.width,
+      goalConfig.walls.width,
+      0xFFD700);
 
     this.physics.add.existing(bottomBase, true);
     this.platforms.add(bottomBase);
+    this.gameObjectsGroup.add(bottomBase);
+
 
     // Create an invisible goal sensor inside the U to detect when the ball enters
-    this.goal = this.physics.add.image(x, y + wallHeight / 4, 'goalSensor');
-    this.goal.setDisplaySize(baseWidth - 10, wallHeight / 2); // Adjust size to fit inside the U
+    this.goal = this.physics.add.image(goalConfig.position.x, goalConfig.position.y + goalConfig.walls.height / 4, 'goalSensor');
+    this.goal.setDisplaySize(goalConfig.base.width - 10, goalConfig.walls.height / 2); // Adjust size to fit inside the U
     this.goal.setVisible(false); // Make the sensor invisible
     // @ts-ignore
     this.goal.body!.setAllowGravity(false);
@@ -291,11 +297,17 @@ export default class GameScene extends Phaser.Scene {
 
     // Define goalArea as a Rectangle to represent the goal boundaries
     this.goalArea = new Phaser.Geom.Rectangle(
-      x - baseWidth / 2,  // Left bound of the goal area
-      y,                     // Top bound of the goal area
-      baseWidth,             // Width of the goal area
-      wallHeight             // Height of the goal area
+      goalConfig.position.x - goalConfig.base.width / 2,  // Left bound of the goal area
+      goalConfig.position.y - goalConfig.walls.height * 0.25,                     // Top bound of the goal area
+      goalConfig.base.width,             // Width of the goal area
+      goalConfig.walls.height * 0.75             // Height of the goal area
     );
+
+    // Visualize the goal area with a semi-transparent color for debugging
+    const goalAreaGraphics = this.add.graphics();
+
+    goalAreaGraphics.fillStyle(0x00ff00, 0.3); // Green color with 30% opacity
+    goalAreaGraphics.fillRectShape(this.goalArea);
 
     // Collision detection for winning when the ball enters the U shape
     this.physics.add.overlap(this.ball, this.goal, this.startGoalStayTimer, undefined, this);

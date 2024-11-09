@@ -37,6 +37,9 @@ export default class GameScene extends Phaser.Scene {
   private strokeCount: number = 0; // Stroke counter
   private strokeText!: Phaser.GameObjects.Text; // Text to display the stroke counter
 
+  private gameObjectsGroup!: Phaser.GameObjects.Group;
+  private uiElementsGroup!: Phaser.GameObjects.Group;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -48,10 +51,10 @@ export default class GameScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    this.physics.world.gravity.y = 500;
-
     const worldWidth = width * 2;  // Twice the width of the visible area
     const worldHeight = height * 2; // Twice the height of the visible area
+
+    this.physics.world.gravity.y = 500;
 
     // Set world bounds
     this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
@@ -66,6 +69,10 @@ export default class GameScene extends Phaser.Scene {
 
     this.physics.world.gravity.y = 500; // Adjust gravity to suit natural ball drop
     this.platforms = this.physics.add.staticGroup();
+
+    // Initialize groups
+    this.gameObjectsGroup = this.add.group(); // Physics group for game objects
+    this.uiElementsGroup = this.add.group(); // Standard group for UI elements
 
     // Add the ground as main platform
     platforms.push(
@@ -83,9 +90,26 @@ export default class GameScene extends Phaser.Scene {
 
     // Create a graphics object for the trajectory preview
     this.trajectoryGraphics = this.add.graphics();
+    this.gameObjectsGroup.add(this.trajectoryGraphics);
 
     // Store the initial scale of the stroke text
     this.createStrokeText(width);
+
+    // Add miniMap
+    this.createMiniMap();
+
+    this.cameras.main.ignore(this.uiElementsGroup.getChildren());
+    const uiCamera = this.cameras.getCamera('ui');
+    const miniMapCamera = this.cameras.getCamera('mini-map');
+
+    if (uiCamera) {
+      uiCamera.ignore(this.gameObjectsGroup.getChildren());
+    }
+
+   if (miniMapCamera) {
+      // Make the minimap camera ignore UI elements, so it only shows the game world
+      miniMapCamera.ignore(this.uiElementsGroup.getChildren());
+    }
 
     /**
      * Listener for User Interaction
@@ -107,6 +131,51 @@ export default class GameScene extends Phaser.Scene {
       });
   }
 
+  createMiniMap() {
+    // Create a minimap camera
+    // todo: calculate from the world data
+    const minimapWidth = 120; // Width of the minimap in pixels
+    const minimapHeight = 50; // Height of the minimap in pixels
+
+    // Define the bounds of the game world (replace with your actual game world size if known)
+    const worldWidth = this.physics.world.bounds.width;
+    const worldHeight = this.physics.world.bounds.height;
+
+    // Calculate zoom level to fit the entire game world in the minimap
+    const zoomX = minimapWidth / worldWidth;
+    const zoomY = minimapHeight / worldHeight;
+    const minimapZoom = Math.min(zoomX, zoomY);
+
+    // Define the position for the minimap in the top-left corner
+    const minimapX = 10;
+    const minimapY = 10;
+
+    // Draw the minimap background and border
+    const minimapBackground = this.add.graphics();
+
+    minimapBackground.lineStyle(10, 0xff0000, 1); // Red color for the border
+    minimapBackground.strokeRect(minimapX - 1, minimapY - 1, minimapWidth / minimapZoom - 15, minimapHeight / minimapZoom - 1); // Border around background
+
+    // Ensure the background is rendered below the minimap camera
+    minimapBackground.setDepth(-1);
+
+    // Position the minimap camera in the top-left corner
+    const minimapCamera = this.cameras.add(minimapX, minimapY, minimapWidth, minimapHeight, false,'mini-map')
+      .setZoom(minimapZoom);
+
+    // Configure the minimap camera to follow the entire game world bounds
+    minimapCamera.setBounds(0, 0, worldWidth, worldHeight);
+    minimapCamera.startFollow(this.ball);
+   // minimapCamera.ignore(minimapBackground);
+
+    this.cameras.main.ignore(minimapBackground);
+    const uiCamera = this.cameras.getCamera('ui');
+
+    if (uiCamera) {
+      uiCamera.ignore(minimapBackground);
+    }
+  }
+
   createWorldData(platformData: PlatformData[]) {
     // Create platforms from data
     platformData.forEach(({ x, y, width: platformWidth, height: platformHeight, color }, index) => {
@@ -120,6 +189,7 @@ export default class GameScene extends Phaser.Scene {
     // Convert all platform objects in the group to static physics bodies
     this.platforms.getChildren().forEach((platform) => {
       this.physics.add.existing(platform, true);
+      this.gameObjectsGroup.add(platform);
     });
   }
 
@@ -132,15 +202,7 @@ export default class GameScene extends Phaser.Scene {
       padding: { x: 5, y: 5 },
     }).setOrigin(1, 0); // Align to the top right
 
-    // Set the main camera to ignore the strokeText, so it only appears in the UI camera
-    this.cameras.main.ignore(this.strokeText);
-
-    // Set the UI camera to ignore everything else except strokeText
-    const uiCamera = this.cameras.getCamera('ui');
-
-    if (uiCamera) {
-      uiCamera.ignore(this.children.list.filter(child => child !== this.strokeText));
-    }
+    this.uiElementsGroup.add(this.strokeText);
   }
 
   createBall(height: number) {
@@ -167,6 +229,9 @@ export default class GameScene extends Phaser.Scene {
 
     // Set the camera to follow the ball
     this.cameras.main.startFollow(this.ball);
+
+    // Add ball to game objects
+    this.gameObjectsGroup.add(this.ball);
   }
 
   createGoal(x: number, y: number) {

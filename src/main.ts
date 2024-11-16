@@ -4,6 +4,8 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import GameScene from './game/scenes/GameScene';
 
+import LoadingScene from '@/game/scenes/LoadingScene';
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: 1200,
@@ -16,7 +18,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [GameScene],
+  scene: [LoadingScene, GameScene],
 };
 
 // Initialize Phaser game

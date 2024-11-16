@@ -55,6 +55,10 @@ export default class GameScene extends Phaser.Scene {
     // no assets to load
   }
 
+  init(data: { levelIndex: number }) {
+    this.currentLevelIndex = data.levelIndex ?? 0; // Default to 0 if no level index is provided
+  }
+
   create() {
     const { width, height } = this.scale;
 
@@ -65,7 +69,16 @@ export default class GameScene extends Phaser.Scene {
     this.uiElementsGroup = this.add.group(); // Standard group for UI elements
     this.platforms = this.physics.add.staticGroup();
 
-    this.loadLevel(this.currentLevelIndex);
+
+    // Listen for the load next level event from LoadingScene
+    this.events.on('loadNextLevel', () => {
+      this.loadLevel(this.currentLevelIndex);
+    });
+
+    // Start with the first level load
+    if (this.currentLevelIndex === 0) {
+      this.loadLevel(this.currentLevelIndex);
+    }
 
     // Set a plain color for the background (light blue for a sky effect)
     this.cameras.main.setBackgroundColor('#87CEEB');
@@ -125,6 +138,8 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.goal) this.goal.destroy();
 
+    if (this.ball) this.ball.destroy();
+
     // Load level data
     this.currentLevel = levels[levelIndex];
 
@@ -148,9 +163,6 @@ export default class GameScene extends Phaser.Scene {
 
     // Add the platforms to the world
     this.createWorldData(this.currentLevel.platforms);
-
-    // Add the playable ball
-    this.createBall(this.currentLevel.ballSpawn.x, this.currentLevel.ballSpawn.y);
 
     // Create the U-shaped goal
     this.createGoal(this.currentLevel.goal);
@@ -216,6 +228,9 @@ export default class GameScene extends Phaser.Scene {
       this.physics.add.existing(platform, true);
       this.gameObjectsGroup.add(platform);
     });
+
+    // Add the playable ball
+    this.createBall(this.currentLevel.ballSpawn.x, this.currentLevel.ballSpawn.y);
   }
 
   createStrokeText(gameAreaWidth: number) {
@@ -261,7 +276,9 @@ export default class GameScene extends Phaser.Scene {
     this.events.on('preupdate', () => {
       const ballBody = this.ball.body as Phaser.Physics.Arcade.Body;
 
-      this.ballOnGround = ballBody.blocked.down || ballBody.touching.down;
+      if (ballBody) {
+        this.ballOnGround = ballBody.blocked?.down || ballBody.touching?.down;
+      }
     });
 
     // Set the camera to follow the ball
@@ -341,7 +358,7 @@ export default class GameScene extends Phaser.Scene {
   startGoalStayTimer() {
     // Only start the timer if it's not already running
     if (!this.goalTimer) {
-      this.goalTimer = this.time.delayedCall(1000, () => {
+      this.goalTimer = this.time.delayedCall(700, () => {
         this.winGame();
       });
     }
@@ -508,6 +525,10 @@ export default class GameScene extends Phaser.Scene {
     return power;
   }
 
+  private updateStrokeText() {
+    this.strokeText.setText(`Strokes: ${this.strokeCount}`);
+  }
+
   shootBall() {
     if (this.isAiming) {
 
@@ -525,7 +546,7 @@ export default class GameScene extends Phaser.Scene {
       this.powerText.setText('Power: 0%');
       this.isAiming = false;
       this.strokeCount++;
-      this.strokeText.setText(`Strokes: ${this.strokeCount}`);
+      this.updateStrokeText();
 
       // Release pointer lock after shooting
       if (this.input.mouse!.locked) {
@@ -540,6 +561,8 @@ export default class GameScene extends Phaser.Scene {
   update() {
     const ballBody = this.ball.body as Phaser.Physics.Arcade.Body;
     const ballPosition = new Phaser.Geom.Point(this.ball.x, this.ball.y);
+
+    if (!ballBody) return;
 
     // Check if the ball is outside the goal area and reset timer if necessary
     if (this.goalTimer && !Phaser.Geom.Rectangle.ContainsPoint(this.goalArea, ballPosition)) {
@@ -600,6 +623,10 @@ export default class GameScene extends Phaser.Scene {
 
     restartButton.on('pointerdown', () => {
       this.finishLevel();
+      popup.destroy();
+      text.destroy();
+      strokeMessage.destroy();
+      restartButton.destroy();
     });
 
     const miniMapCamera = this.cameras.getCamera('mini-map');
@@ -614,16 +641,15 @@ export default class GameScene extends Phaser.Scene {
 
   finishLevel() {
     this.strokeCount = 0;
+    this.currentLevelIndex++;
+    this.updateStrokeText();
 
-    this.time.delayedCall(2000, () => {
-      this.currentLevelIndex++;
-
-      if (this.currentLevelIndex < levels.length) {
-        this.loadLevel(this.currentLevelIndex); // Load next level
-        this.scene.restart(); // Restart or end game if no more levels
-      } else {
-        this.scene.restart(); // Restart or end game if no more levels
-      }
-    });
+    if (this.currentLevelIndex < levels.length) {
+      this.loadLevel(this.currentLevelIndex); // Load the next level in the array
+    } else {
+      //console.log('All levels complete! Restarting game.');
+      this.currentLevelIndex = 0; // Optionally restart from the first level
+      this.loadLevel(this.currentLevelIndex);
+    }
   }
 }

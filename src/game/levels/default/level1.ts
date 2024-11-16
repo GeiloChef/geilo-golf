@@ -11,7 +11,7 @@ export const mapData: MapDataConfig = {
   ],
   height: 1200,
   width: 800,
-  ballSpawn: { x: 100, y: 1100 },
+  ballSpawn: { x: 200, y: 1000 },
   goal: {
     walls: {
       width: 5,

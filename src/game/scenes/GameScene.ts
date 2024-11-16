@@ -260,12 +260,15 @@ export default class GameScene extends Phaser.Scene {
     this.ball = this.physics.add.image(posX, posY, 'ballTexture');
     this.ball.setCircle(ballRadius); // Set physics body as a circle with radius
     this.ball.setOrigin(0.5, 0.5); // Center the texture on the physics body
-    this.ball.setBounce(0.5); // Make the ball bouncy
+    this.ball.setBounce(0.4); // Make the ball bouncy
     this.ball.setCollideWorldBounds(true); // Prevent ball from going out of bounds
     this.ball.setDrag(10);
 
-    // Add collision between the ball and all platforms in the group
-    //this.physics.add.collider(this.ball, this.platforms);
+    // Adjust the ball's weight by setting its mass
+    const ballBody = this.ball.body as Phaser.Physics.Arcade.Body;
+
+    ballBody.setGravityY(500); // Add additional downward gravity for the ball
+    ballBody.setMass(1.2); // Increase the mass to make it feel "heavier"
 
     // Set up a collision callback to detect when the ball touches the ground
     this.physics.add.collider(this.ball, this.platforms, () => {
@@ -274,8 +277,6 @@ export default class GameScene extends Phaser.Scene {
 
     // Call `preUpdate` to reset `ballOnGround` if the ball is not touching ground
     this.events.on('preupdate', () => {
-      const ballBody = this.ball.body as Phaser.Physics.Arcade.Body;
-
       if (ballBody) {
         this.ballOnGround = ballBody.blocked?.down || ballBody.touching?.down;
       }

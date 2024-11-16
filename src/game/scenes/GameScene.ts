@@ -18,7 +18,6 @@ const levels = [Level1, Level2];
 export default class GameScene extends Phaser.Scene {
   private ball!: Phaser.Physics.Arcade.Image;
   private isAiming: boolean = false;
-  private isBouncing: boolean = false;
   private trajectoryGraphics!: Phaser.GameObjects.Graphics;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private goal!: Phaser.Physics.Arcade.Image; // The invisible sensor for the goal
@@ -120,6 +119,14 @@ export default class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', this.startAiming, this);
     document.addEventListener('pointermove', this.handlePointerMoveOutside);
     document.addEventListener('mouseup', this.handlePointerUpOutside);
+
+    this.game.events.on('blur', () => {
+      this.isAiming = false; // Reset aiming state
+    });
+
+    this.game.events.on('focus', () => {
+      this.isAiming = false; // Ensure aiming starts fresh on focus regain
+    });
 
     // Set up scroll wheel zoom functionality
     this.input.on('wheel',

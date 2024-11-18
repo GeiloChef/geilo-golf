@@ -553,8 +553,12 @@ export default class GameScene extends Phaser.Scene {
       this.drawPowerBar(0); // Reset power bar after shooting
       this.powerText.setText('Power: 0%');
       this.isAiming = false;
-      this.strokeCount++;
-      this.updateStrokeText();
+
+      if(this.ball.body!.velocity.x > 0 || this.ball.body!.velocity.y > 0) {
+        this.strokeCount++;
+        this.updateStrokeText();
+      }
+
 
       // Release pointer lock after shooting
       if (this.input.mouse!.locked) {

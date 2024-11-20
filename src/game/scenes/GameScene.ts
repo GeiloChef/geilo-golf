@@ -2,6 +2,13 @@ import Phaser from 'phaser';
 
 import { mapData as Level1 } from '@/game/levels/default/level1';
 import { mapData as Level2 } from '@/game/levels/default/level2';
+import { mapData as Level3 } from '@/game/levels/default/level3';
+import { mapData as Level4 } from '@/game/levels/default/level4';
+import { mapData as Level5 } from '@/game/levels/default/level5';
+import { mapData as Level6 } from '@/game/levels/default/level6';
+import { mapData as Level7 } from '@/game/levels/default/level7';
+import { mapData as Level8 } from '@/game/levels/default/level8';
+import { mapData as Level9 } from '@/game/levels/default/level9';
 import { GoalConfig, MapDataConfig, PlatformData } from '@/models/MapInterfaces';
 
 interface PointerPosition {
@@ -13,7 +20,17 @@ const groundHeight = 40;
 
 const debug: boolean = false;
 
-const levels = [Level1, Level2];
+const levels = [
+  Level1,
+  Level2,
+  Level3,
+  Level4,
+  Level5,
+  Level6,
+  Level7,
+  Level8,
+  Level9,
+];
 
 export default class GameScene extends Phaser.Scene {
   private ball!: Phaser.Physics.Arcade.Image;
@@ -162,7 +179,7 @@ export default class GameScene extends Phaser.Scene {
       {
         x: this.currentLevel.width / 2,
         y: this.currentLevel.height - groundHeight / 2,
-        width: this.currentLevel.height,
+        width: this.currentLevel.width,
         height: groundHeight,
         color: 0x228B22
       },  // Ground

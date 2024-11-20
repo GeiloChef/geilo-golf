@@ -3,12 +3,13 @@ import { MapDataConfig } from '@/models/MapInterfaces';
 const groundHeight = 40;
 
 export const mapData: MapDataConfig = {
-  name: 'default 2',
+  name: 'default 5',
   groundHeight: groundHeight,
   platforms: [
-    { x: 1000, y: 440, width: 200, height: groundHeight, color: 0x228B22 },
-    { x: 1045, y: 400, width: 50, height: groundHeight, color: 0x228B22 },
-    { x: 955, y: 400, width: 50, height: groundHeight, color: 0x228B22 },
+    { x: 0, y: 240, width: 900, height: groundHeight, color: 0x228B22 },
+    { x: 90, y: 200, width: 100, height: groundHeight, color: 0x228B22 },
+    { x: 430, y: 60, width: groundHeight, height: 200, color: 0x228B22 },
+    { x: 430, y: 420, width: groundHeight, height: 200, color: 0x228B22 },
   ],
   width: 1200,
   height: 500,
@@ -22,8 +23,8 @@ export const mapData: MapDataConfig = {
       width: 40,
     },
     position: {
-      x: 1000,
-      y: 400
+      x: 22,
+      y: 200
     }
   }
 };

@@ -21,8 +21,8 @@ const groundHeight = 40;
 const debug: boolean = false;
 
 const levels = [
-  //Level1,
-  //Level2,
+  Level1,
+  Level2,
   Level3,
   Level4,
   Level5,

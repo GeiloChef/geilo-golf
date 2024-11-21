@@ -21,8 +21,8 @@ const groundHeight = 40;
 const debug: boolean = false;
 
 const levels = [
-  Level1,
-  Level2,
+  //Level1,
+  //Level2,
   Level3,
   Level4,
   Level5,
@@ -36,6 +36,7 @@ export default class GameScene extends Phaser.Scene {
   private ball!: Phaser.Physics.Arcade.Image;
   private isAiming: boolean = false;
   private trajectoryGraphics!: Phaser.GameObjects.Graphics;
+  private miniMapBackground!: Phaser.GameObjects.Graphics;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private goal!: Phaser.Physics.Arcade.Image; // The invisible sensor for the goal
   private goalArea!: Phaser.Geom.Rectangle;
@@ -91,11 +92,6 @@ export default class GameScene extends Phaser.Scene {
       this.loadLevel(this.currentLevelIndex);
     });
 
-    // Start with the first level load
-    if (this.currentLevelIndex === 0) {
-      this.loadLevel(this.currentLevelIndex);
-    }
-
     // Set a plain color for the background (light blue for a sky effect)
     this.cameras.main.setBackgroundColor('#87CEEB');
 
@@ -112,8 +108,14 @@ export default class GameScene extends Phaser.Scene {
     // Store the initial scale of the stroke text
     this.createStrokeText(width);
 
+
+    // Start with the first level load
+    if (this.currentLevelIndex === 0) {
+      this.loadLevel(this.currentLevelIndex);
+    }
+
     // Add miniMap
-    this.createMiniMap();
+    //this.createMiniMap();
 
     this.cameras.main.ignore(this.uiElementsGroup.getChildren());
     const uiCamera = this.cameras.getCamera('ui');
@@ -190,9 +192,30 @@ export default class GameScene extends Phaser.Scene {
 
     // Create the U-shaped goal
     this.createGoal(this.currentLevel.goal);
+
+    this.createMiniMap();
+
+    const uiCamera = this.cameras.getCamera('ui');
+    const miniMapCamera = this.cameras.getCamera('mini-map');
+
+    if (uiCamera) {
+      uiCamera.ignore(this.gameObjectsGroup.getChildren());
+    }
+
+    if (miniMapCamera) {
+      // Make the minimap camera ignore UI elements, so it only shows the game world
+      miniMapCamera.ignore(this.uiElementsGroup.getChildren());
+    }
   }
 
   createMiniMap() {
+    const miniMapCamera = this.cameras.getCamera('mini-map');
+
+    if (miniMapCamera) {
+      this.cameras.remove(miniMapCamera);
+      this.miniMapBackground.destroy();
+    }
+
     // Create a minimap camera
     // todo: calculate from the world data
     const minimapWidth = 120; // Width of the minimap in pixels
@@ -212,13 +235,13 @@ export default class GameScene extends Phaser.Scene {
     const minimapY = 10;
 
     // Draw the minimap background and border
-    const minimapBackground = this.add.graphics();
+    this.miniMapBackground = this.add.graphics();
 
-    minimapBackground.lineStyle(10, 0xff0000, 1); // Red color for the border
-    minimapBackground.strokeRect(minimapX - 1, minimapY - 1, minimapWidth / minimapZoom - 15, minimapHeight / minimapZoom - 1); // Border around background
+    this.miniMapBackground.lineStyle(10, 0xff0000, 1); // Red color for the border
+    this.miniMapBackground.strokeRect(minimapX - 1, minimapY - 1, minimapWidth / minimapZoom - 15, minimapHeight / minimapZoom - 1); // Border around background
 
     // Ensure the background is rendered below the minimap camera
-    minimapBackground.setDepth(-1);
+    this.miniMapBackground.setDepth(-1);
 
     // Position the minimap camera in the top-left corner
     const minimapCamera = this.cameras.add(minimapX, minimapY, minimapWidth, minimapHeight, false,'mini-map')
@@ -229,11 +252,11 @@ export default class GameScene extends Phaser.Scene {
     minimapCamera.startFollow(this.ball);
    // minimapCamera.ignore(minimapBackground);
 
-    this.cameras.main.ignore(minimapBackground);
+    this.cameras.main.ignore(this.miniMapBackground);
     const uiCamera = this.cameras.getCamera('ui');
 
     if (uiCamera) {
-      uiCamera.ignore(minimapBackground);
+      uiCamera.ignore(this.miniMapBackground);
     }
   }
 
@@ -571,7 +594,7 @@ export default class GameScene extends Phaser.Scene {
       this.powerText.setText('Power: 0%');
       this.isAiming = false;
 
-      if(this.ball.body!.velocity.x > 0 || this.ball.body!.velocity.y > 0) {
+      if(this.ball.body!.velocity.x !== 0 && this.ball.body!.velocity.y !== 0) {
         this.strokeCount++;
         this.updateStrokeText();
       }

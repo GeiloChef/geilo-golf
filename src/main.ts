@@ -20,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
     },
   },
   scene: [
-    //StartScene,
+    StartScene,
     GameScene
   ],
 };
